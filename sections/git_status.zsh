@@ -14,7 +14,7 @@ SPACESHIP_GIT_STATUS_UNTRACKED="${SPACESHIP_GIT_STATUS_UNTRACKED="?"}"
 SPACESHIP_GIT_STATUS_ADDED="${SPACESHIP_GIT_STATUS_ADDED="+"}"
 SPACESHIP_GIT_STATUS_MODIFIED="${SPACESHIP_GIT_STATUS_MODIFIED="!"}"
 SPACESHIP_GIT_STATUS_RENAMED="${SPACESHIP_GIT_STATUS_RENAMED="»"}"
-SPACESHIP_GIT_STATUS_DELETED="${SPACESHIP_GIT_STATUS_DELETED="✘"}"
+SPACESHIP_GIT_STATUS_DELETED="${SPACESHIP_GIT_STATUS_DELETED="x"}"
 SPACESHIP_GIT_STATUS_STASHED="${SPACESHIP_GIT_STATUS_STASHED="$"}"
 SPACESHIP_GIT_STATUS_UNMERGED="${SPACESHIP_GIT_STATUS_UNMERGED="="}"
 SPACESHIP_GIT_STATUS_AHEAD="${SPACESHIP_GIT_STATUS_AHEAD="⇡"}"
@@ -39,51 +39,55 @@ spaceship_git_status() {
 
   INDEX=$(command git status --porcelain -b 2> /dev/null)
 
-  # Check for untracked files
-  if $(echo "$INDEX" | command grep -E '^\?\? ' &> /dev/null); then
-    git_status="$SPACESHIP_GIT_STATUS_UNTRACKED$git_status"
+  spaceship::section \
+    "gray" \
+    "$SPACESHIP_GIT_STATUS_PREFIX";
+
+  # Check for unmerged files
+  unmerged_file_count=$(echo "$INDEX" | command grep '^U[UDA] ' | wc -l);
+  unmerged_file_count=$(($unmerged_file_count + $(echo "$INDEX" | command grep '^AA ' | wc -l)));
+  unmerged_file_count=$(($unmerged_file_count + $(echo "$INDEX" | command grep '^DD ' | wc -l)));
+  unmerged_file_count=$(($unmerged_file_count + $(echo "$INDEX" | command grep '^[DA]U ' | wc -l)));
+  if [ $unmerged_file_count -gt 0 ]; then
+    spaceship::section "117" "$unmerged_file_count$SPACESHIP_GIT_STATUS_UNMERGED";
   fi
 
-  # Check for staged files
-  if $(echo "$INDEX" | command grep '^A[ MDAU] ' &> /dev/null); then
-    git_status="$SPACESHIP_GIT_STATUS_ADDED$git_status"
-  elif $(echo "$INDEX" | command grep '^M[ MD] ' &> /dev/null); then
-    git_status="$SPACESHIP_GIT_STATUS_ADDED$git_status"
-  elif $(echo "$INDEX" | command grep '^UA' &> /dev/null); then
-    git_status="$SPACESHIP_GIT_STATUS_ADDED$git_status"
+  # Check for untracked files
+  untracked_file_count=$(echo "$INDEX" | command grep -E '^\?\? ' | wc -l);
+  if [ $untracked_file_count -gt 0 ]; then
+    spaceship::section "white" "$untracked_file_count$SPACESHIP_GIT_STATUS_UNTRACKED";
   fi
 
   # Check for modified files
-  if $(echo "$INDEX" | command grep '^[ MARC]M ' &> /dev/null); then
-    git_status="$SPACESHIP_GIT_STATUS_MODIFIED$git_status"
+  modified_file_count=$(echo "$INDEX" | command grep '^[ MARC]M ' | wc -l);
+  if [ $modified_file_count -gt 0 ]; then
+    spaceship::section "yellow" "$modified_file_count$SPACESHIP_GIT_STATUS_MODIFIED";
   fi
 
   # Check for renamed files
-  if $(echo "$INDEX" | command grep '^R[ MD] ' &> /dev/null); then
-    git_status="$SPACESHIP_GIT_STATUS_RENAMED$git_status"
+  rename_file_count=$(echo "$INDEX" | command grep '^R[ MD] ' | wc -l);
+  if [ $rename_file_count -gt 0 ]; then
+    spaceship::section "cyan" "$rename_file_count$SPACESHIP_GIT_STATUS_RENAMED";
+  fi
+
+  # Check for staged files
+  staged_file_count=$(echo "$INDEX" | command grep '^A[ MDAU] ' | wc -l);
+  staged_file_count=$(($staged_file_count + $(echo "$INDEX" | command grep '^M[ MD] ' | wc -l)));
+  staged_file_count=$(($staged_file_count + $(echo "$INDEX" | command grep '^UA' | wc -l)));
+  if [ $staged_file_count -gt 0 ]; then
+    spaceship::section "green" "$staged_file_count$SPACESHIP_GIT_STATUS_ADDED";
   fi
 
   # Check for deleted files
-  if $(echo "$INDEX" | command grep '^[MARCDU ]D ' &> /dev/null); then
-    git_status="$SPACESHIP_GIT_STATUS_DELETED$git_status"
-  elif $(echo "$INDEX" | command grep '^D[ UM] ' &> /dev/null); then
-    git_status="$SPACESHIP_GIT_STATUS_DELETED$git_status"
+  deleted_file_count=$(echo "$INDEX" | command grep '^[MARCDU ]D ' | wc -l);
+  deleted_file_count=$(($deleted_file_count + $(echo "$INDEX" | command grep '^D[ UM] ' | wc -l)));
+  if [ $deleted_file_count -gt 0 ]; then
+    spaceship::section "red" "$deleted_file_count$SPACESHIP_GIT_STATUS_DELETED";
   fi
 
   # Check for stashes
   if $(command git rev-parse --verify refs/stash >/dev/null 2>&1); then
-    git_status="$SPACESHIP_GIT_STATUS_STASHED$git_status"
-  fi
-
-  # Check for unmerged files
-  if $(echo "$INDEX" | command grep '^U[UDA] ' &> /dev/null); then
-    git_status="$SPACESHIP_GIT_STATUS_UNMERGED$git_status"
-  elif $(echo "$INDEX" | command grep '^AA ' &> /dev/null); then
-    git_status="$SPACESHIP_GIT_STATUS_UNMERGED$git_status"
-  elif $(echo "$INDEX" | command grep '^DD ' &> /dev/null); then
-    git_status="$SPACESHIP_GIT_STATUS_UNMERGED$git_status"
-  elif $(echo "$INDEX" | command grep '^[DA]U ' &> /dev/null); then
-    git_status="$SPACESHIP_GIT_STATUS_UNMERGED$git_status"
+    spaceship::section "blue" "$SPACESHIP_GIT_STATUS_STASHED";
   fi
 
   # Check whether branch is ahead
@@ -100,16 +104,11 @@ spaceship_git_status() {
 
   # Check wheather branch has diverged
   if [[ "$is_ahead" == true && "$is_behind" == true ]]; then
-    git_status="$SPACESHIP_GIT_STATUS_DIVERGED$git_status"
+    spaceship::section "magenta" "$SPACESHIP_GIT_STATUS_DIVERGED";
   else
-    [[ "$is_ahead" == true ]] && git_status="$SPACESHIP_GIT_STATUS_AHEAD$git_status"
-    [[ "$is_behind" == true ]] && git_status="$SPACESHIP_GIT_STATUS_BEHIND$git_status"
+    [[ "$is_ahead" == true ]] && spaceship::section "magenta" "$SPACESHIP_GIT_STATUS_AHEAD";
+    [[ "$is_behind" == true ]] && spaceship::section "magenta" "$SPACESHIP_GIT_STATUS_BEHIND";
   fi
 
-  if [[ -n $git_status ]]; then
-    # Status prefixes are colorized
-    spaceship::section \
-      "$SPACESHIP_GIT_STATUS_COLOR" \
-      "$SPACESHIP_GIT_STATUS_PREFIX$git_status$SPACESHIP_GIT_STATUS_SUFFIX"
-  fi
+  spaceship::section "gray" "$SPACESHIP_GIT_STATUS_SUFFIX";
 }
